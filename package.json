@@ -1,6 +1,7 @@
 {
 	"name": "@dust-mail/website",
 	"license": "MIT",
+	"packageManager": "yarn@1.22.19",
 	"scripts": {
 		"dev": "next dev -p 4731",
 		"build": "next build",
