@@ -4,33 +4,35 @@ import Link from "next/link";
 
 import styles from "./Index.module.scss";
 
-import axios from "axios";
-
 import { Sponsor } from "@interfaces/sponsor";
 import { Asset } from "@interfaces/version";
+
+import { fetchLatestRelease, fetchSponsors } from "@utils/http/github";
 
 import Footer from "@components/Footer";
 import Header from "@components/Header";
 import Layout from "@components/Layout";
 
-const Index: NextPage<{
-	latestVersion: { assets: Asset[] };
+interface PageProps {
+	latestRelease: { assets: Asset[] };
 	sponsors: Sponsor[];
-}> = ({ latestVersion, sponsors }) => {
+}
+
+const Index: NextPage<PageProps> = ({ latestRelease, sponsors }) => {
 	const badgeScale = 0.4;
 
 	const badgeWidth = 564 * badgeScale;
 	const badgeHeight = 168 * badgeScale;
 
-	const windowsDownload = latestVersion.assets.find((asset) =>
+	const windowsDownload = latestRelease.assets.find((asset) =>
 		asset.name.endsWith(".msi")
 	);
 
-	const osxDownload = latestVersion.assets.find((asset) =>
+	const osxDownload = latestRelease.assets.find((asset) =>
 		asset.name.endsWith(".dmg")
 	);
 
-	const linuxDownload = latestVersion.assets.find((asset) =>
+	const linuxDownload = latestRelease.assets.find((asset) =>
 		asset.name.endsWith(".AppImage")
 	);
 
@@ -173,32 +175,26 @@ const Index: NextPage<{
 	);
 };
 
-export const getStaticProps: GetStaticProps = async () => {
-	const { data: assets } = await axios.get<{
-		assets: { name: string; browser_download_url: string }[];
-	}>(
-		`https://api.github.com/repos/${process.env.NEXT_PUBLIC_GITHUB_USERNAME}/${process.env.NEXT_PUBLIC_GITHUB_REPO}/releases/latest`
-	);
+export const getStaticProps: GetStaticProps<PageProps> = async () => {
+	const githubUsername = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
+	const githubRepo = process.env.NEXT_PUBLIC_GITHUB_REPO;
 
-	const { data: sponsors } = await axios.get<{
-		sponsors: {
-			handle: string;
-			avatar: string;
-			details: { html_url?: string };
-		}[];
-	}>(
-		`https://ghs.vercel.app/sponsors/${process.env.NEXT_PUBLIC_GITHUB_USERNAME}`
-	);
+	if (githubRepo === undefined || githubUsername === undefined)
+		return { notFound: true };
+
+	const latestRelease = await fetchLatestRelease(githubUsername, githubRepo);
+
+	const sponsors = await fetchSponsors();
 
 	return {
 		props: {
-			latestVersion: {
-				assets: assets.assets.map((asset) => ({
+			latestRelease: {
+				assets: latestRelease.assets.map((asset) => ({
 					url: asset.browser_download_url,
 					name: asset.name
 				}))
 			},
-			sponsors: sponsors.sponsors.map((sponsor) => ({
+			sponsors: sponsors.map((sponsor) => ({
 				avatar: sponsor.avatar,
 				username: sponsor.handle,
 				url: sponsor.details.html_url ?? `https://github.com/${sponsor.handle}`

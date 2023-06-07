@@ -1,4 +1,5 @@
 import { GetStaticProps, NextPage } from "next";
+import { fetchAllReleases, fetchLatestRelease } from "utils/http/github";
 
 import { FC, useEffect, useState } from "react";
 
@@ -211,32 +212,26 @@ const Download: NextPage<{ versions: Version[] }> = ({ versions }) => {
 };
 
 export const getStaticProps: GetStaticProps = async () => {
-	const { data } = await axios.get<
-		{
-			assets: { name: string; browser_download_url: string }[];
-			tag_name: string;
-			body: string;
-		}[]
-	>(
-		`https://api.github.com/repos/${process.env.NEXT_PUBLIC_GITHUB_USERNAME}/${process.env.NEXT_PUBLIC_GITHUB_REPO}/releases`
-	);
+	const githubUsername = process.env.NEXT_PUBLIC_GITHUB_USERNAME;
+	const githubRepo = process.env.NEXT_PUBLIC_GITHUB_REPO;
 
-	const { data: latestVersion } = await axios.get<{
-		tag_name: string;
-	}>(
-		`https://api.github.com/repos/${process.env.NEXT_PUBLIC_GITHUB_USERNAME}/${process.env.NEXT_PUBLIC_GITHUB_REPO}/releases/latest`
-	);
+	if (githubRepo === undefined || githubUsername === undefined)
+		return { notFound: true };
 
-	const versions: Version[] = data
-		.filter((version) => version.assets.length >= 5)
-		.map((version) => ({
-			assets: version.assets.map(({ browser_download_url, name }) => ({
+	const releases = await fetchAllReleases(githubUsername, githubRepo);
+
+	const latestRelease = await fetchLatestRelease(githubUsername, githubRepo);
+
+	const versions: Version[] = releases
+		.filter((release) => release.assets.length >= 5)
+		.map((release) => ({
+			assets: release.assets.map(({ browser_download_url, name }) => ({
 				url: browser_download_url,
 				name
 			})),
-			description: version.body != "" ? version.body : null,
-			latest: latestVersion.tag_name == version.tag_name,
-			tag: version.tag_name
+			description: release.body != "" ? release.body : null,
+			latest: latestRelease.tag_name == release.tag_name,
+			tag: release.tag_name
 		}));
 
 	return { props: { versions }, revalidate: 5 * 60 };
